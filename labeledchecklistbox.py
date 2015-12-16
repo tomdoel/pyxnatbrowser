@@ -9,11 +9,12 @@ from observable import Observable
 
 
 class LabeledCheckListBox(Frame):
-    def __init__(self, parent, selected_items, label_text):
+    def __init__(self, parent, selected_items, unselected_items, label_text):
         Frame.__init__(self, parent)
 
         self.list_objects = []
         self.selected_items_model = selected_items
+        self.unselected_items_model = unselected_items
         scrollbar = Scrollbar(self, orient=VERTICAL)
         Label(self, text=label_text).pack()
         self.check_list_box = CheckListBox(self, scrollbar)
@@ -22,18 +23,20 @@ class LabeledCheckListBox(Frame):
         scrollbar.pack(side=RIGHT, fill=Y)
         self.check_list_box.pack(side=LEFT, fill=BOTH, expand=1)
 
-    def _update_list(self, values, labels):
+    def _update_list(self, values, labels, is_downloaded_list):
         self.list_objects = []
         self.check_list_box.clear()
-        for value, label in zip(values, labels):
+        for value, label, is_downloaded in zip(values, labels, is_downloaded_list):
             self.list_objects.append(value)
-            self.check_list_box.append(label)
+            self.check_list_box.append(label, is_downloaded)
 
         self.check_list_box.add_listener(self._on_select)
 
     def _on_select(self, selected_indices):
         selected_items = [self.list_objects[int(index)] for index in self.check_list_box.curselection()]
+        unselected_items = [self.list_objects[int(index)] for index in self.check_list_box.curunselection()]
         self.selected_items_model.selected_items = selected_items
+        self.unselected_items_model.selected_items = unselected_items
 
 
 class CheckListBox(Text, Observable):
@@ -48,23 +51,31 @@ class CheckListBox(Text, Observable):
         self.delete(1.0, END)
         self.next_index = 0
 
-    def append(self, label):
+    def append(self, label, is_downloaded):
         new_checkbutton = CustomCheckButton(self, label, self.next_index)
         self.window_create("end", window=new_checkbutton)
         self.insert("end", "\n")
         self.checkbuttons[self.next_index] = new_checkbutton
+        if is_downloaded:
+            new_checkbutton.select()
         new_checkbutton.add_listener(self._checkbox_changed)
         self.next_index += 1
 
     def _checkbox_changed(self, index, value):
         self.checked_indices = []
+        self.unchecked_indices = []
         for index, checkbutton in self.checkbuttons.items():
             if checkbutton.var.get():
                 self.checked_indices.append(index)
+            else:
+                self.unchecked_indices.append(index)
         self._notify(self.checked_indices)
 
     def curselection(self):
         return self.checked_indices
+
+    def curunselection(self):
+        return self.unchecked_indices
 
 
 class CustomCheckButton(Checkbutton, Observable):

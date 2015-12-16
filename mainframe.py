@@ -51,9 +51,9 @@ class SubjectList(LabeledListBox):
 
 
 class ScanList(LabeledCheckListBox):
-    def __init__(self, parent, selected_projects, selected_subjects, selected_scans, mat_nat_database):
-        LabeledCheckListBox.__init__(self, parent, selected_scans, 'Scan:')
-        self.mat_nat_database = mat_nat_database
+    def __init__(self, parent, selected_projects, selected_subjects, selected_scans, unselected_scans, database):
+        LabeledCheckListBox.__init__(self, parent, selected_scans, unselected_scans, 'Scan:')
+        self.database = database
         self.selected_projects = selected_projects
         self.selected_subjects = selected_subjects
         selected_subjects.add_listener(self._subject_selection_changed)
@@ -61,6 +61,7 @@ class ScanList(LabeledCheckListBox):
     def _update_items(self, subject_list):
         visible_scans = []
         visible_scans_labels = []
+        is_downloaded = []
         for subject in subject_list:
             session_map = subject.get_session_map()
             for session in session_map.values():
@@ -68,7 +69,8 @@ class ScanList(LabeledCheckListBox):
                 for scan in scan_map.values():
                     visible_scans.append(scan)
                     visible_scans_labels.append(subject.subject_label + ':' + scan.scan_id)
-        self._update_list(visible_scans, visible_scans_labels)
+                    is_downloaded.append(self.database.is_scan_downloaded(subject.project_id, subject.subject_id, scan.scan_id))
+        self._update_list(visible_scans, visible_scans_labels, is_downloaded)
 
     def _subject_selection_changed(self, value):
         self._update_items(value)
@@ -80,6 +82,7 @@ class MainFrame:
         self.selected_projects = SelectedItems()
         self.selected_subjects = SelectedItems()
         self.selected_scans = SelectedItems()
+        self.unselected_scans = SelectedItems()
 
         master_paned_window = PanedWindow(root)
         master_paned_window.pack(fill=BOTH, expand=1)
@@ -91,14 +94,26 @@ class MainFrame:
         master_paned_window.add(self.subjects)
 
         self.scans = ScanList(master_paned_window, self.selected_projects, self.selected_subjects, self.selected_scans,
-                              database)
+                              self.unselected_scans, database)
         master_paned_window.add(self.scans)
 
         self.selected_scans.add_listener(self._scan_selection_changed)
+        self.unselected_scans.add_listener(self._scan_unselection_changed)
 
     def _scan_selection_changed(self, scans):
         if len(scans) > 0:
-            result = messagebox.askyesno("Download scan", "Do you want to download these scan?")
-            if result:
-                for scan in scans:
+            for scan in scans:
+                if not self.database.is_scan_downloaded(scan.project_id, scan.subject_id, scan.scan_id):
                     self.database.download_scan(scan.project_id, scan.subject_id, scan.scan_id)
+
+    def _scan_unselection_changed(self, scans):
+        scans_to_remove = []
+        for scan in scans:
+            if self.database.is_scan_downloaded(scan.project_id, scan.subject_id, scan.scan_id):
+                scans_to_remove.append(scan)
+
+        if len(scans_to_remove) > 0:
+            result = messagebox.askyesno("Delete downloaded scan", "Do you want to delete these scans from your computer?")
+            if result:
+                for scan in scans_to_remove:
+                    self.database.delete_scan(scan.project_id, scan.subject_id, scan.scan_id)
