@@ -2,7 +2,7 @@
 # Author: Tom Doel www.tomdoel.com
 # Distributed under the Simplified BSD License.
 
-from tkinter import Frame, Scrollbar, VERTICAL, Label, Listbox, EXTENDED, RIGHT, Y, LEFT, BOTH, END
+from tkinter import Frame, Scrollbar, VERTICAL, Label, Listbox, EXTENDED, RIGHT, Y, LEFT, BOTH, END, Checkbutton
 
 from observable import Observable
 
@@ -15,7 +15,7 @@ class LabeledListBox(Frame):
         self.selected_items_model = selected_items
         scrollbar = Scrollbar(self, orient=VERTICAL)
         Label(self, text=label_text).pack()
-        self.listbox = Listbox(self, selectmode=EXTENDED, exportselection=0, yscrollcommand=scrollbar.set)
+        self.listbox = Listbox(self, selectmode=EXTENDED, exportselection=0, yscrollcommand=scrollbar.set, borderwidth=0, highlightthickness=0)
         scrollbar.config(command=self.listbox.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         self.listbox.pack(side=LEFT, fill=BOTH, expand=1)
@@ -28,6 +28,7 @@ class LabeledListBox(Frame):
         for value, label in zip(values, labels):
             self.list_objects.append(value)
             self.listbox.insert(END, label)
+            # self.listbox.insert(END, Checkbutton(label))
 
         for index, label in enumerate(labels):
             if label in old_selected_item_labels:
@@ -49,5 +50,6 @@ class SelectedItems(Observable):
 
     @selected_items.setter
     def selected_items(self, value):
-        self._selected_items = value
-        self._notify(value)
+        if self.selected_items != value:
+            self._selected_items = value
+            self._notify(value)

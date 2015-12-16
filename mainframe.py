@@ -4,7 +4,9 @@
 
 from tkinter import PanedWindow
 from tkinter.constants import BOTH
+from tkinter import messagebox
 
+from labeledchecklistbox import LabeledCheckListBox
 from labeledlistbox import LabeledListBox, SelectedItems
 
 
@@ -22,7 +24,7 @@ class ProjectList(LabeledListBox):
         project_text = []
         for project in self.project_map.values():
             project_list.append(project)
-            project_text.append('Project:' + project.project_id)
+            project_text.append(project.project_name)
         self._update_list(project_list, project_text)
 
 
@@ -41,16 +43,16 @@ class SubjectList(LabeledListBox):
             subject_map = project.get_subject_map()
             for subject in subject_map.values():
                 visible_subjects.append(subject)
-                visible_subjects_labels.append(project.project_id + ':' + subject.label)
+                visible_subjects_labels.append(project.project_name + ':' + subject.subject_label)
         self._update_list(visible_subjects, visible_subjects_labels)
 
     def _project_selection_changed(self, value):
         self._update_items(value)
 
 
-class ScanList(LabeledListBox):
+class ScanList(LabeledCheckListBox):
     def __init__(self, parent, selected_projects, selected_subjects, selected_scans, mat_nat_database):
-        LabeledListBox.__init__(self, parent, selected_scans, 'Scan:')
+        LabeledCheckListBox.__init__(self, parent, selected_scans, 'Scan:')
         self.mat_nat_database = mat_nat_database
         self.selected_projects = selected_projects
         self.selected_subjects = selected_subjects
@@ -65,7 +67,7 @@ class ScanList(LabeledListBox):
                 scan_map = session.get_scan_map()
                 for scan in scan_map.values():
                     visible_scans.append(scan)
-                    visible_scans_labels.append(subject.project_id + ':' + subject.label + ':' + scan.session_label)
+                    visible_scans_labels.append(subject.subject_label + ':' + scan.scan_id)
         self._update_list(visible_scans, visible_scans_labels)
 
     def _subject_selection_changed(self, value):
@@ -73,7 +75,8 @@ class ScanList(LabeledListBox):
 
 
 class MainFrame:
-    def __init__(self, root, mat_nat_database):
+    def __init__(self, root, database):
+        self.database = database
         self.selected_projects = SelectedItems()
         self.selected_subjects = SelectedItems()
         self.selected_scans = SelectedItems()
@@ -81,13 +84,21 @@ class MainFrame:
         master_paned_window = PanedWindow(root)
         master_paned_window.pack(fill=BOTH, expand=1)
 
-        self.projects = ProjectList(master_paned_window, self.selected_projects, mat_nat_database)
+        self.projects = ProjectList(master_paned_window, self.selected_projects, database)
         master_paned_window.add(self.projects)
 
-        self.subjects = SubjectList(master_paned_window, self.selected_projects, self.selected_subjects,
-                                    mat_nat_database)
+        self.subjects = SubjectList(master_paned_window, self.selected_projects, self.selected_subjects, database)
         master_paned_window.add(self.subjects)
 
         self.scans = ScanList(master_paned_window, self.selected_projects, self.selected_subjects, self.selected_scans,
-                              mat_nat_database)
+                              database)
         master_paned_window.add(self.scans)
+
+        self.selected_scans.add_listener(self._scan_selection_changed)
+
+    def _scan_selection_changed(self, scans):
+        if len(scans) > 0:
+            result = messagebox.askyesno("Download scan", "Do you want to download these scan?")
+            if result:
+                for scan in scans:
+                    self.database.download_scan(scan.project_id, scan.subject_id, scan.scan_id)

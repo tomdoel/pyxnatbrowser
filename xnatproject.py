@@ -10,23 +10,23 @@ class XnatProject(Base):
     """ Describes an XNAT project
     """
 
-    def __init__(self, rest_client, name, project_id, secondary_id, description):
+    def __init__(self, rest_client, project_id, project_name, secondary_id, description):
         super().__init__()
 
         self.rest_client = rest_client
-        self.name = name
         self.project_id = project_id
+        self.project_name = project_name
         self.secondary_id = secondary_id
         self.description = description
         self.subject_map = None
 
     @staticmethod
     def create_from_server_object(rest_client, server_object):
-        name = Utilities.get_optional_dict_value(server_object, 'name')
+        project_name = Utilities.get_optional_dict_value(server_object, 'name')
         project_id = Utilities.get_optional_dict_value(server_object, 'id')
         secondary_id = Utilities.get_optional_dict_value(server_object, 'secondary_id')
         description = Utilities.get_optional_dict_value(server_object, 'description')
-        return XnatProject(rest_client, name, project_id, secondary_id, description)
+        return XnatProject(rest_client, project_id, project_name, secondary_id, description)
 
     def get_subject_map(self):
         self._populate_subject_map_if_necessary()
@@ -38,7 +38,7 @@ class XnatProject(Base):
 
         self._populate_subject_map_if_necessary()
 
-        if ~self.subject_map.hasKey(patient_id):
+        if not (patient_id in self.subject_map):
             return None
         else:
             return self.subject_map[patient_id]
@@ -50,7 +50,7 @@ class XnatProject(Base):
             if scan is not None:
                 resources = scan.get_resources()
                 if len(resources) > 0:
-                    resource = resources(1)
+                    resource = resources[0]
                     return resource
 
         resource = None
