@@ -2,6 +2,7 @@
 # Author: Tom Doel www.tomdoel.com
 # Distributed under the Simplified BSD License.
 
+
 class RestConfiguration(object):
 
     def __init__(self):
