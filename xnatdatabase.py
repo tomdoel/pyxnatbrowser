@@ -9,6 +9,8 @@ import zipfile
 
 import shutil
 
+from observable import Observable
+
 
 class XnatDatabase(object):
 
@@ -112,24 +114,20 @@ class XnatDatabase(object):
         if subject_id not in self.downloaded_cache[project_id]:
             self.downloaded_cache[project_id][subject_id] = {}
         if scan_id not in self.downloaded_cache[project_id][subject_id]:
-            self.downloaded_cache[scan_id] = self._get_is_downloaded_from_file_system(self.config.server_name, project_id, subject_id, scan_id)
+            self.downloaded_cache[scan_id] = ScanCacheRecord(self, self.config.server_name, project_id, subject_id, scan_id)
+
+        return self.downloaded_cache[scan_id].is_downloaded_from_file_system()
+
+    def get_scan_download_model(self, project_id, subject_id, scan_id):
+
+        if project_id not in self.downloaded_cache:
+            self.downloaded_cache[project_id] = {}
+        if subject_id not in self.downloaded_cache[project_id]:
+            self.downloaded_cache[project_id][subject_id] = {}
+        if scan_id not in self.downloaded_cache[project_id][subject_id]:
+            self.downloaded_cache[scan_id] = ScanCacheRecord(self, self.config.server_name, project_id, subject_id, scan_id)
 
         return self.downloaded_cache[scan_id]
-
-    def _get_is_downloaded_from_file_system(self, server_name, project_id, subject_id, scan_id):
-        project = self.get_project(project_id)
-
-        if project is None:
-            return False
-
-        data_directory = self.get_data_directory_and_create_if_necessary()
-        scan_directory = os.path.join(data_directory, server_name, project_id, subject_id, scan_id)
-        if not os.path.exists(scan_directory):
-            return False
-        num_files = len(os.listdir(scan_directory))
-        resource = project.get_resource_for_series_uid(subject_id, scan_id)
-        num_resource_files = resource.file_count
-        return num_files >= num_resource_files
 
     def _populate_project_map_if_necessary(self):
         if self.project_map is None:
@@ -163,3 +161,61 @@ class XnatDatabase(object):
                 full_file_name = os.path.join(base_path, file_name)
                 if os.path.isdir(full_file_name):
                     XnatDatabase.remove_empty_directories(full_file_name)
+
+
+class ScanCacheRecord(Observable):
+    def __init__(self, database, server_name, project_id, subject_id, scan_id):
+        Observable.__init__(self)
+        self.scan_id = scan_id
+        self.subject_id = subject_id
+        self.server_name = server_name
+        self.database = database
+        self.project_id = project_id
+        self.cached_num_local_files = None
+        self.cached_num_resource_files = None
+        self._compute_cache_values_if_undefined()
+
+    def get_number_of_server_files(self):
+        if self.cached_num_resource_files is None:
+            self._populate_num_server_files()
+        return self.cached_num_resource_files
+
+    def get_number_of_downloaded_files(self):
+        if self.cached_num_local_files is None:
+            self._populate_num_local_files()
+        return self.cached_num_local_files
+
+    def is_downloaded_from_file_system(self):
+        self._compute_cache_values_if_undefined()
+        return self.cached_num_local_files >= self.cached_num_resource_files
+
+    def _force_cache_reload(self):
+        self._populate_num_server_files()
+        self._populate_num_local_files()
+
+    def _compute_cache_values_if_undefined(self):
+        if self.cached_num_resource_files is None:
+            self._populate_num_server_files()
+        if self.cached_num_local_files is None:
+            self._populate_num_local_files()
+
+    def _populate_num_server_files(self):
+        project = self.database.get_project(self.project_id)
+
+        if project is None:
+            self.cached_num_resource_files = None
+            return
+
+        resource = project.get_resource_for_series_uid(self.subject_id, self.scan_id)
+        self.cached_num_resource_files = resource.file_count
+
+    def _populate_num_local_files(self):
+        data_directory = self.database.get_data_directory_and_create_if_necessary()
+        scan_directory = os.path.join(data_directory, self.server_name, self.project_id, self.subject_id, self.scan_id)
+        if not os.path.exists(scan_directory):
+            self.cached_num_local_files = 0
+            return
+
+        # Get file list excluding system files
+        file_names = [f for f in os.listdir(scan_directory) if not f.startswith('.')]
+        self.cached_num_local_files = len(file_names)

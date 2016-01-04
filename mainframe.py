@@ -59,21 +59,33 @@ class ScanList(LabeledCheckListBox):
         selected_subjects.add_listener(self._subject_selection_changed)
 
     def _update_items(self, subject_list):
-        visible_scans = []
-        visible_scans_labels = []
-        is_downloaded = []
+        scan_records = []
         for subject in subject_list:
             session_map = subject.get_session_map()
             for session in session_map.values():
                 scan_map = session.get_scan_map()
                 for scan in scan_map.values():
-                    visible_scans.append(scan)
-                    visible_scans_labels.append(subject.subject_label + ':' + scan.scan_id)
-                    is_downloaded.append(self.database.is_scan_downloaded(subject.project_id, subject.subject_id, scan.scan_id))
-        self._update_list(visible_scans, visible_scans_labels, is_downloaded)
+                    scan_records.append(DynamicScanRecord(scan, subject.subject_label + ':' + scan.scan_id, self.database.get_scan_download_model(subject.project_id, subject.subject_id, scan.scan_id)))
+        self._update_list(scan_records)
 
     def _subject_selection_changed(self, value):
         self._update_items(value)
+
+
+class DynamicScanRecord:
+    def __init__(self, scan, subject_label, model):
+        self.scan = scan
+        self.label = subject_label
+        self.model = model
+
+    def get_number_of_downloaded_files(self):
+        return self.model.get_number_of_downloaded_files()
+
+    def get_number_of_server_files(self):
+        return self.model.get_number_of_server_files()
+
+    def is_downloaded(self):
+        return self.model.is_downloaded_from_file_system()
 
 
 class MainFrame:
@@ -117,3 +129,5 @@ class MainFrame:
             if result:
                 for scan in scans_to_remove:
                     self.database.delete_scan(scan.project_id, scan.subject_id, scan.scan_id)
+
+        self.scans.refresh_checks()
