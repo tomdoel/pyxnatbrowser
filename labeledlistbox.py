@@ -28,7 +28,6 @@ class LabeledListBox(Frame):
         for value, label in zip(values, labels):
             self.list_objects.append(value)
             self.listbox.insert(END, label)
-            # self.listbox.insert(END, Checkbutton(label))
 
         for index, label in enumerate(labels):
             if label in old_selected_item_labels:

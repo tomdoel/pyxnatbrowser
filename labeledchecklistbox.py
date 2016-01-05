@@ -7,18 +7,16 @@ from tkinter import Frame, Scrollbar, VERTICAL, Label, Listbox, EXTENDED, RIGHT,
 from tkinter.ttk import Progressbar
 
 from observable import Observable
+from xnatdatabase import ProgressStatus
 
 
 class LabeledCheckListBox(Frame):
-    def __init__(self, parent, selected_items, unselected_items, label_text):
+    def __init__(self, parent, selected_items_model, unselected_items_model, label_text):
         Frame.__init__(self, parent)
 
-        self.list_objects = []
-        self.selected_items_model = selected_items
-        self.unselected_items_model = unselected_items
         scrollbar = Scrollbar(self, orient=VERTICAL)
         Label(self, text=label_text).pack()
-        self.check_list_box = CheckListBox(self, scrollbar)
+        self.check_list_box = CheckListBox(self, scrollbar, selected_items_model, unselected_items_model)
         scrollbar.config(command=self.check_list_box.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         self.check_list_box.pack(side=LEFT, fill=BOTH, expand=1)
@@ -27,117 +25,104 @@ class LabeledCheckListBox(Frame):
         self.check_list_box.refresh_checks()
 
     def _update_list(self, scan_records):
+        self.check_list_box.update_list(scan_records)
+
+
+class CheckListBox(Text):
+    def __init__(self, parent, scrollbar, selected_items_model, unselected_items_model):
+        Text.__init__(self, parent, yscrollcommand=scrollbar.set)
+
+        self.selected_items_model = selected_items_model
+        self.unselected_items_model = unselected_items_model
         self.list_objects = []
-        self.check_list_box.clear()
+        self.check_buttons = {}
+        self.next_index = 0
+        self.checked_indices = None
+        self.unchecked_indices = None
+
+    def update_list(self, scan_records):
+        self.delete(1.0, END)  # Clears the list entries
+
+        self.list_objects = []
+        self.check_buttons = {}
+        self.next_index = 0
+        self.checked_indices = None
+        self.unchecked_indices = None
         for scan_record in scan_records:
             self.list_objects.append(scan_record.scan)
-            self.check_list_box.append(scan_record.label, scan_record)
+            new_checkbutton = ProgressCheckButton(self, scan_record.label, self.next_index, scan_record)
+            self.window_create("end", window=new_checkbutton)
+            self.insert("end", "\n")
+            self.check_buttons[self.next_index] = new_checkbutton
+            new_checkbutton.add_listener(self._checkbox_changed)
+            self.next_index += 1
 
-        self.check_list_box.add_listener(self._on_select)
-
-    def _on_select(self, selected_indices):
-        selected_items = [self.list_objects[int(index)] for index in self.check_list_box.curselection()]
-        unselected_items = [self.list_objects[int(index)] for index in self.check_list_box.curunselection()]
-        self.selected_items_model.selected_items = selected_items
-        self.unselected_items_model.selected_items = unselected_items
-
-
-class CheckListBox(Text, Observable):
-    def __init__(self, parent, scrollbar):
-        Text.__init__(self, parent, yscrollcommand=scrollbar.set)
-        Observable.__init__(self)
-        self.checkbuttons = {}
-        self.next_index = 0
-        self.checked_indices = None
-        self.unchecked_indices = None
-
-    def clear(self):
-        self.delete(1.0, END)
-        self.next_index = 0
-        self.checked_indices = None
-        self.unchecked_indices = None
-
-    def append(self, label, download_model):
-        new_checkbutton = ProgressCheckButton(self, label, self.next_index, download_model)
-        self.window_create("end", window=new_checkbutton)
-        self.insert("end", "\n")
-        self.checkbuttons[self.next_index] = new_checkbutton
-        # if download_model.is_downloaded():
-        #     new_checkbutton.select()
-        new_checkbutton.add_listener(self._checkbox_changed)
-        self.next_index += 1
-        self.checked_indices = None
-        self.unchecked_indices = None
+        self._populate_cache()
 
     def refresh_checks(self):
-        self.populate_cache()
-        for index, checkbutton in self.checkbuttons.items():
+        for index, checkbutton in self.check_buttons.items():
             checkbutton.refresh_check()
+        self._populate_cache()
 
-    def populate_cache(self):
+    def _populate_cache(self):
         self.checked_indices = []
         self.unchecked_indices = []
-        for index, checkbutton in self.checkbuttons.items():
+        for index, checkbutton in self.check_buttons.items():
             if checkbutton.is_checked():
                 self.checked_indices.append(index)
             else:
                 self.unchecked_indices.append(index)
 
     def _checkbox_changed(self, index, value):
-        self.populate_cache()
-        self._notify(self.checked_indices)
+        self._populate_cache()
+        selected_items = [self.list_objects[int(index)] for index in self.checked_indices]
+        unselected_items = [self.list_objects[int(index)] for index in self.unchecked_indices]
 
-    def curselection(self):
-        if self.checked_indices is None or self.unchecked_indices is None:
-            self.populate_cache()
-
-        return self.checked_indices
-
-    def curunselection(self):
-        if self.checked_indices is None or self.unchecked_indices is None:
-            self.populate_cache()
-
-        return self.unchecked_indices
+        # Update the selection models - these will trigger notifications via their setter methods
+        self.selected_items_model.selected_items = selected_items
+        self.unselected_items_model.selected_items = unselected_items
 
 
 class ProgressCheckButton(Frame, Observable):
-    def __init__(self, parent, label, index, download_model):
+    def __init__(self, parent, label, index, status_model):
         Frame.__init__(self, parent)
         Observable.__init__(self)
         self.index = index
-        self.download_model = download_model
+        self.status_model = status_model
         self.var = IntVar()
+        self.var.set(self.status_model.is_checked())
         self.progress_var = IntVar()
+        self.progress_status = ProgressStatus.undefined
         self.check_button = Checkbutton(self, text=label, variable=self.var, command=self._check_changed)
-        self.progress_bar = Progressbar(self, orient='horizontal', mode='determinate', variable=self.progress_var, maximum=download_model.get_number_of_server_files())
+        self.progress_bar = Progressbar(self, orient='horizontal', mode='indeterminate', variable=self.progress_var)
         self.check_button.pack(side=LEFT, fill="both", expand=True)
-        self.progress_bar.pack(side=RIGHT, fill="both", expand=True)
-
-        if self.download_model.is_downloaded():
-            self.select()
-        self.update_progress()
-        # self.progress_bar.start()
+        self.status_model.model.add_listener(self._progress_status_changed)
 
     def refresh_check(self):
-        if self.download_model.is_downloaded():
-            self.select()
+        if self.status_model.is_checked_force_reload():
+            self.check_button.select()
         else:
-            self.deselect()
+            self.check_button.deselect()
 
     def is_checked(self):
         return self.var.get()
 
-    def update_progress(self):
-        self.progress_var.set(self.download_model.get_number_of_downloaded_files())
+    def _progress_status_changed(self, new_status):
+        self._refresh_progress()
+
+    def _refresh_progress(self):
+        status = self.status_model.get_status()
+        if not status == self.progress_status:
+            if status == ProgressStatus.in_progress:
+                self.progress_bar.pack(side=RIGHT, fill="both", expand=True)
+            else:
+                self.progress_bar.pack_forget()
 
     def _check_changed(self):
-        self._notify(self.index, self.var.get())
+        new_checked = self.var.get()
+        if new_checked is not self.status_model.is_checked():
+            self._notify(self.index, new_checked)
 
-    def select(self):
-        self.check_button.select()
-
-    def deselect(self):
-        self.check_button.deselect()
 
 class SelectedItems(Observable):
     def __init__(self):
@@ -153,5 +138,3 @@ class SelectedItems(Observable):
         if self.selected_items != value:
             self._selected_items = value
             self._notify(value)
-
-

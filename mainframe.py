@@ -8,6 +8,7 @@ from tkinter import messagebox
 
 from labeledchecklistbox import LabeledCheckListBox
 from labeledlistbox import LabeledListBox, SelectedItems
+from observable import Observable
 
 
 class ProjectList(LabeledListBox):
@@ -53,6 +54,7 @@ class SubjectList(LabeledListBox):
 class ScanList(LabeledCheckListBox):
     def __init__(self, parent, selected_projects, selected_subjects, selected_scans, unselected_scans, database):
         LabeledCheckListBox.__init__(self, parent, selected_scans, unselected_scans, 'Scan:')
+
         self.database = database
         self.selected_projects = selected_projects
         self.selected_subjects = selected_subjects
@@ -60,20 +62,26 @@ class ScanList(LabeledCheckListBox):
 
     def _update_items(self, subject_list):
         scan_records = []
+        self.database.clear_all_download_model_listeners()
         for subject in subject_list:
             session_map = subject.get_session_map()
             for session in session_map.values():
                 scan_map = session.get_scan_map()
                 for scan in scan_map.values():
-                    scan_records.append(DynamicScanRecord(scan, subject.subject_label + ':' + scan.scan_id, self.database.get_scan_download_model(subject.project_id, subject.subject_id, scan.scan_id)))
+                    scan_records.append(DynamicScanRecord(scan, subject.subject_label + ':' + scan.scan_id,
+                                                          self.database.get_scan_download_model(subject.project_id,
+                                                                                                subject.subject_id,
+                                                                                                scan.scan_id)))
         self._update_list(scan_records)
 
     def _subject_selection_changed(self, value):
         self._update_items(value)
 
 
-class DynamicScanRecord:
+class DynamicScanRecord(Observable):
     def __init__(self, scan, subject_label, model):
+        Observable.__init__(self)
+
         self.scan = scan
         self.label = subject_label
         self.model = model
@@ -84,8 +92,15 @@ class DynamicScanRecord:
     def get_number_of_server_files(self):
         return self.model.get_number_of_server_files()
 
-    def is_downloaded(self):
+    def is_checked(self):
         return self.model.is_downloaded_from_file_system()
+
+    def is_checked_force_reload(self):
+        self.model.force_cache_reload()
+        return self.model.is_downloaded_from_file_system()
+
+    def get_status(self):
+        return self.model.status
 
 
 class MainFrame:
@@ -125,7 +140,8 @@ class MainFrame:
                 scans_to_remove.append(scan)
 
         if len(scans_to_remove) > 0:
-            result = messagebox.askyesno("Delete downloaded scan", "Do you want to delete these scans from your computer?")
+            result = messagebox.askyesno("Delete downloaded scan",
+                                         "Do you want to delete these scans from your computer?")
             if result:
                 for scan in scans_to_remove:
                     self.database.delete_scan(scan.project_id, scan.subject_id, scan.scan_id)

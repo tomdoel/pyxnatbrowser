@@ -8,12 +8,12 @@ import uuid
 import zipfile
 
 import shutil
+from enum import Enum
 
 from observable import Observable
 
 
 class XnatDatabase(object):
-
     def __init__(self, rest_client, config):
         self.config = config
         self.rest_client = rest_client
@@ -23,7 +23,7 @@ class XnatDatabase(object):
     def get_project_map(self):
         self._populate_project_map_if_necessary()
         return self.project_map
-        
+
     def get_project(self, project_id):
         self._populate_project_map_if_necessary()
         if project_id in self.project_map.keys():
@@ -35,6 +35,19 @@ class XnatDatabase(object):
         project = self.get_project(project_id)
 
         if project is not None:
+            # Get the download status cache
+            if project_id not in self.downloaded_cache:
+                self.downloaded_cache[project_id] = {}
+            if subject_id not in self.downloaded_cache[project_id]:
+                self.downloaded_cache[project_id][subject_id] = {}
+            if scan_id not in self.downloaded_cache[project_id][subject_id]:
+                self.downloaded_cache[project_id][subject_id][scan_id] = ScanCacheRecord(self, self.config.server_name,
+                                                                                         project_id, subject_id,
+                                                                                         scan_id)
+
+            status_cache = self.downloaded_cache[project_id][subject_id][scan_id]
+            status_cache.set_downloading()
+
             resource = project.get_resource_for_series_uid(subject_id, scan_id)
 
             uid = uuid.uuid4()
@@ -75,11 +88,7 @@ class XnatDatabase(object):
             shutil.rmtree(temp_dir)
 
             # Update the cache
-            if project_id not in self.downloaded_cache:
-                self.downloaded_cache[project_id] = {}
-            if subject_id not in self.downloaded_cache[project_id]:
-                self.downloaded_cache[subject_id] = {}
-            self.downloaded_cache[scan_id] = True
+            status_cache.set_downloaded()
 
     def delete_scan(self, project_id, subject_id, scan_id):
         scan_directory = self.get_scan_directory(self.config.server_name, project_id, subject_id, scan_id)
@@ -114,9 +123,11 @@ class XnatDatabase(object):
         if subject_id not in self.downloaded_cache[project_id]:
             self.downloaded_cache[project_id][subject_id] = {}
         if scan_id not in self.downloaded_cache[project_id][subject_id]:
-            self.downloaded_cache[scan_id] = ScanCacheRecord(self, self.config.server_name, project_id, subject_id, scan_id)
+            self.downloaded_cache[project_id][subject_id][scan_id] = ScanCacheRecord(self, self.config.server_name,
+                                                                                     project_id, subject_id,
+                                                                                     scan_id)
 
-        return self.downloaded_cache[scan_id].is_downloaded_from_file_system()
+        return self.downloaded_cache[project_id][subject_id][scan_id].is_downloaded_from_file_system()
 
     def get_scan_download_model(self, project_id, subject_id, scan_id):
 
@@ -125,9 +136,17 @@ class XnatDatabase(object):
         if subject_id not in self.downloaded_cache[project_id]:
             self.downloaded_cache[project_id][subject_id] = {}
         if scan_id not in self.downloaded_cache[project_id][subject_id]:
-            self.downloaded_cache[scan_id] = ScanCacheRecord(self, self.config.server_name, project_id, subject_id, scan_id)
+            self.downloaded_cache[project_id][subject_id][scan_id] = ScanCacheRecord(self, self.config.server_name,
+                                                                                     project_id, subject_id,
+                                                                                     scan_id)
 
-        return self.downloaded_cache[scan_id]
+        return self.downloaded_cache[project_id][subject_id][scan_id]
+
+    def clear_all_download_model_listeners(self):
+        for project_caches in self.downloaded_cache.values():
+            for subject_caches in project_caches.values():
+                for scan_cache in subject_caches.values():
+                    scan_cache.clear_all()
 
     def _populate_project_map_if_necessary(self):
         if self.project_map is None:
@@ -173,6 +192,7 @@ class ScanCacheRecord(Observable):
         self.project_id = project_id
         self.cached_num_local_files = None
         self.cached_num_resource_files = None
+        self.status = ProgressStatus.undefined
         self._compute_cache_values_if_undefined()
 
     def get_number_of_server_files(self):
@@ -189,9 +209,20 @@ class ScanCacheRecord(Observable):
         self._compute_cache_values_if_undefined()
         return self.cached_num_local_files >= self.cached_num_resource_files
 
-    def _force_cache_reload(self):
+    def force_cache_reload(self):
         self._populate_num_server_files()
         self._populate_num_local_files()
+
+    def set_downloading(self):
+        if self.status is not ProgressStatus.in_progress:
+            self.status = ProgressStatus.in_progress
+            self._notify(self.status)
+
+    def set_downloaded(self):
+        if self.status is not ProgressStatus.complete:
+            self._populate_num_local_files()
+            self.status = ProgressStatus.complete
+            self._notify(self.status)
 
     def _compute_cache_values_if_undefined(self):
         if self.cached_num_resource_files is None:
@@ -219,3 +250,22 @@ class ScanCacheRecord(Observable):
         # Get file list excluding system files
         file_names = [f for f in os.listdir(scan_directory) if not f.startswith('.')]
         self.cached_num_local_files = len(file_names)
+
+    def _update_status(self):
+        if self.is_downloaded_from_file_system():
+            new_state = ProgressStatus.complete
+        elif self.status == ProgressStatus.in_progress:
+            new_state = ProgressStatus.in_progress
+        else:
+            new_state = ProgressStatus.not_started
+
+        if self.status is not new_state:
+            self.status = new_state
+            self._notify(self.status)
+
+
+class ProgressStatus(Enum):
+    not_started = 0
+    in_progress = 1
+    complete = 2
+    undefined = 3
