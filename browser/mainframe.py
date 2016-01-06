@@ -2,13 +2,14 @@
 # Author: Tom Doel www.tomdoel.com
 # Distributed under the Simplified BSD License.
 
-from tkinter import PanedWindow
+from tkinter import PanedWindow, Menu
 from tkinter.constants import BOTH
 from tkinter import messagebox
 
-from labeledchecklistbox import LabeledCheckListBox
-from labeledlistbox import LabeledListBox, SelectedItems
-from observable import Observable
+from browser.labeledchecklistbox import LabeledCheckListBox
+from browser.labeledlistbox import LabeledListBox, SelectedItems
+from database.observable import Observable
+from browser import __version__
 
 
 class ProjectList(LabeledListBox):
@@ -105,6 +106,7 @@ class DynamicScanRecord(Observable):
 
 class MainFrame:
     def __init__(self, root, database):
+        self.root = root
         self.database = database
         self.selected_projects = SelectedItems()
         self.selected_subjects = SelectedItems()
@@ -126,6 +128,28 @@ class MainFrame:
 
         self.selected_scans.add_listener(self._scan_selection_changed)
         self.unselected_scans.add_listener(self._scan_unselection_changed)
+
+        # Create a menu
+        root_menu = Menu(root)
+        root.config(menu=root_menu)
+
+        xnat_menu = Menu(root_menu)
+        root_menu.add_cascade(label="GIFT-Cloud", menu=xnat_menu)
+
+        xnat_menu.add_command(label="About", command=self.menu_about)
+        xnat_menu.add_separator()
+        xnat_menu.add_command(label="Settings", command=self.menu_settings)
+        xnat_menu.add_separator()
+        xnat_menu.add_command(label="Quit", command=self.menu_exit)
+
+    def menu_exit(self):
+        self.root.quit()
+
+    def menu_about(self):
+        messagebox.showinfo("GIFT-Cloud Downloader", "Version " + __version__)
+
+    def menu_settings(self):
+        messagebox.showinfo("GIFT-Cloud Downloader", "Settings")
 
     def _scan_selection_changed(self, scans):
         if len(scans) > 0:

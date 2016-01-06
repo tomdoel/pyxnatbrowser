@@ -2,8 +2,8 @@
 # Author: Tom Doel www.tomdoel.com
 # Distributed under the Simplified BSD License.
 
-from base import Base
-from utilities import Utilities
+from database.base import Base
+from database.utilities import Utilities
 
 
 class XnatResource(Base):

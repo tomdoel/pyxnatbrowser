@@ -7,12 +7,12 @@ import urllib
 
 import shutil
 
-from xnatproject import XnatProject
-from xnatresource import XnatResource
-from xnatnatscan import XnatNatScan
-from xnatsession import XnatSession
-from xnatsubject import XnatSubject
-from restconfiguration import RestConfiguration
+from database.xnatproject import XnatProject
+from database.xnatresource import XnatResource
+from database.xnatnatscan import XnatNatScan
+from database.xnatsession import XnatSession
+from database.xnatsubject import XnatSubject
+from database.restconfiguration import RestConfiguration
 
 
 class RestClient:

@@ -10,7 +10,7 @@ import zipfile
 import shutil
 from enum import Enum
 
-from observable import Observable
+from database.observable import Observable
 
 
 class XnatDatabase(object):

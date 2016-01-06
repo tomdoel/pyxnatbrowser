@@ -6,9 +6,9 @@
 
 import tkinter
 
-from mainframe import MainFrame
-from xnatdatabase import XnatDatabase
-from restclient import RestClient
+from browser.mainframe import MainFrame
+from database.xnatdatabase import XnatDatabase
+from database.restclient import RestClient
 
 
 class Browser:

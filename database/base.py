@@ -2,7 +2,7 @@
 # Author: Tom Doel www.tomdoel.com
 # Distributed under the Simplified BSD License.
 
-from observable import Observable
+from database.observable import Observable
 
 
 class Base(Observable):

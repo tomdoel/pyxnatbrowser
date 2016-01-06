@@ -6,8 +6,8 @@ from tkinter import Frame, Scrollbar, VERTICAL, Label, Listbox, EXTENDED, RIGHT,
     IntVar
 from tkinter.ttk import Progressbar
 
-from observable import Observable
-from xnatdatabase import ProgressStatus
+from database.observable import Observable
+from database.xnatdatabase import ProgressStatus
 
 
 class LabeledCheckListBox(Frame):

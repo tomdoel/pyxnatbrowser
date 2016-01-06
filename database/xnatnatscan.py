@@ -2,9 +2,9 @@
 # Author: Tom Doel www.tomdoel.com
 # Distributed under the Simplified BSD License.
 
-from base import Base
-from xnatmodality import XnatModality
-from utilities import Utilities
+from database.base import Base
+from database.xnatmodality import XnatModality
+from database.utilities import Utilities
 
 
 class XnatNatScan(Base):

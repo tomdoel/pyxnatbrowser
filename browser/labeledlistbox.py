@@ -4,7 +4,7 @@
 
 from tkinter import Frame, Scrollbar, VERTICAL, Label, Listbox, EXTENDED, RIGHT, Y, LEFT, BOTH, END, Checkbutton
 
-from observable import Observable
+from database.observable import Observable
 
 
 class LabeledListBox(Frame):
