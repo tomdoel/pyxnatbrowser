@@ -238,7 +238,10 @@ class ScanCacheRecord(Observable):
             return
 
         resource = project.get_resource_for_series_uid(self.subject_id, self.scan_id)
-        self.cached_num_resource_files = resource.file_count
+        if resource is None:
+            self.cached_num_resource_files = 0
+        else:
+            self.cached_num_resource_files = resource.file_count
 
     def _populate_num_local_files(self):
         data_directory = self.database.get_data_directory_and_create_if_necessary()
