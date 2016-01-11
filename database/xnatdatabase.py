@@ -14,7 +14,8 @@ from database.observable import Observable
 
 
 class XnatDatabase(object):
-    def __init__(self, rest_client, config):
+    def __init__(self, rest_client, config, application_folder):
+        self.application_folder = application_folder
         self.config = config
         self.rest_client = rest_client
         self.project_map = None
@@ -96,11 +97,9 @@ class XnatDatabase(object):
         XnatDatabase.remove_empty_directories(self.get_data_directory_and_create_if_necessary())
 
     def get_application_directory_and_create_if_necessary(self):
-        home_directory = XnatDatabase.get_user_directory()
-        application_directory = os.path.join(home_directory, self.config.application_directory)
-        if not os.path.exists(application_directory):
-            os.makedirs(application_directory)
-        return application_directory
+        if not os.path.exists(self.application_folder):
+            os.makedirs(self.application_folder)
+        return self.application_folder
 
     def get_data_directory_and_create_if_necessary(self):
         application_directory = self.get_application_directory_and_create_if_necessary()
@@ -159,13 +158,6 @@ class XnatDatabase(object):
         :return:
         """
         return tempfile.mkdtemp()
-
-    @staticmethod
-    def get_user_directory():
-        if os.name == 'nt':
-            return os.environ['USERPROFILE']
-        else:
-            return os.environ['HOME']
 
     @staticmethod
     def remove_empty_directories(base_path):

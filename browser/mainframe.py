@@ -3,13 +3,15 @@
 # Distributed under the Simplified BSD License.
 
 from tkinter import PanedWindow, Menu
-from tkinter.constants import BOTH
 from tkinter import messagebox
+from tkinter.constants import BOTH
 
+from browser import __version__
+from browser.configsave import ConfigSave
 from browser.labeledchecklistbox import LabeledCheckListBox
 from browser.labeledlistbox import LabeledListBox, SelectedItems
+from browser.settingsmenu import SettingsMenu
 from database.observable import Observable
-from browser import __version__
 
 
 class ProjectList(LabeledListBox):
@@ -105,13 +107,15 @@ class DynamicScanRecord(Observable):
 
 
 class MainFrame:
-    def __init__(self, root, database):
+    def __init__(self, root, database, config, config_save):
+        self.config = config
         self.root = root
         self.database = database
         self.selected_projects = SelectedItems()
         self.selected_subjects = SelectedItems()
         self.selected_scans = SelectedItems()
         self.unselected_scans = SelectedItems()
+        self.config_save = config_save
 
         master_paned_window = PanedWindow(root)
         master_paned_window.pack(fill=BOTH, expand=1)
@@ -149,7 +153,7 @@ class MainFrame:
         messagebox.showinfo("GIFT-Cloud Downloader", "Version " + __version__)
 
     def menu_settings(self):
-        messagebox.showinfo("GIFT-Cloud Downloader", "Settings")
+        top = SettingsMenu(self.config_save, self.config)
 
     def _scan_selection_changed(self, scans):
         if len(scans) > 0:
