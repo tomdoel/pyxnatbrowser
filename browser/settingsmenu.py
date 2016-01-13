@@ -2,8 +2,8 @@ from tkinter import Toplevel, Frame, Label, Entry, LEFT, RIGHT, StringVar, Butto
 
 
 class SettingsMenu(object):
-    def __init__(self, config_save, config):
-        self.config = config
+    def __init__(self, config_save):
+        self.config = config_save.get_configuration()
         self.config_save = config_save
         self.window = Toplevel()
         self.server_name_entry = LabelEntry(self.window, "Server name:", False, self.config.server_name)

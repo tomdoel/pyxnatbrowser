@@ -7,11 +7,14 @@ from tkinter import messagebox
 from tkinter.constants import BOTH
 
 from browser import __version__
+from browser.browserconfiguration import BrowserConfiguration
 from browser.configsave import ConfigSave
 from browser.labeledchecklistbox import LabeledCheckListBox
 from browser.labeledlistbox import LabeledListBox, SelectedItems
 from browser.settingsmenu import SettingsMenu
 from database.observable import Observable
+from database.restclient import RestClient
+from database.xnatdatabase import XnatDatabase
 
 
 class ProjectList(LabeledListBox):
@@ -107,31 +110,10 @@ class DynamicScanRecord(Observable):
 
 
 class MainFrame:
-    def __init__(self, root, database, config, config_save):
-        self.config = config
+    def __init__(self, root, default_config):
         self.root = root
-        self.database = database
-        self.selected_projects = SelectedItems()
-        self.selected_subjects = SelectedItems()
-        self.selected_scans = SelectedItems()
-        self.unselected_scans = SelectedItems()
-        self.config_save = config_save
-
-        master_paned_window = PanedWindow(root)
-        master_paned_window.pack(fill=BOTH, expand=1)
-
-        self.projects = ProjectList(master_paned_window, self.selected_projects, database)
-        master_paned_window.add(self.projects)
-
-        self.subjects = SubjectList(master_paned_window, self.selected_projects, self.selected_subjects, database)
-        master_paned_window.add(self.subjects)
-
-        self.scans = ScanList(master_paned_window, self.selected_projects, self.selected_subjects, self.selected_scans,
-                              self.unselected_scans, database)
-        master_paned_window.add(self.scans)
-
-        self.selected_scans.add_listener(self._scan_selection_changed)
-        self.unselected_scans.add_listener(self._scan_unselection_changed)
+        self.config_save = ConfigSave(BrowserConfiguration.get_properties_filename(), default_config)
+        self.database_view = DatabaseView(root, self.config_save)
 
         # Create a menu
         root_menu = Menu(root)
@@ -153,7 +135,37 @@ class MainFrame:
         messagebox.showinfo("GIFT-Cloud Downloader", "Version " + __version__)
 
     def menu_settings(self):
-        top = SettingsMenu(self.config_save, self.config)
+        top = SettingsMenu(self.config_save)
+
+
+
+class DatabaseView:
+    def __init__(self, root, config_save):
+        self.config = config_save.get_configuration()
+        self.root = root
+        application_folder = BrowserConfiguration.get_application_directory_and_create_if_necessary()
+        self.database = XnatDatabase(RestClient(self.config), self.config, application_folder)
+        self.selected_projects = SelectedItems()
+        self.selected_subjects = SelectedItems()
+        self.selected_scans = SelectedItems()
+        self.unselected_scans = SelectedItems()
+        self.config_save = config_save
+
+        master_paned_window = PanedWindow(root)
+        master_paned_window.pack(fill=BOTH, expand=1)
+
+        self.projects = ProjectList(master_paned_window, self.selected_projects, self.database)
+        master_paned_window.add(self.projects)
+
+        self.subjects = SubjectList(master_paned_window, self.selected_projects, self.selected_subjects, self.database)
+        master_paned_window.add(self.subjects)
+
+        self.scans = ScanList(master_paned_window, self.selected_projects, self.selected_subjects, self.selected_scans,
+                              self.unselected_scans, self.database)
+        master_paned_window.add(self.scans)
+
+        self.selected_scans.add_listener(self._scan_selection_changed)
+        self.unselected_scans.add_listener(self._scan_unselection_changed)
 
     def _scan_selection_changed(self, scans):
         if len(scans) > 0:
