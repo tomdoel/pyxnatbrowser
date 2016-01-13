@@ -13,6 +13,6 @@ class PropertyParser(object):
     def add_section_header(properties_file, header_name):
         yield '[{}]\n'.format(header_name)
         for line in properties_file:
-            yield line
+            yield line.replace("\:", ":")
 
 
