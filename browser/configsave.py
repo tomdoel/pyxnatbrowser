@@ -1,6 +1,8 @@
 import os
 from configparser import ConfigParser
 
+from browser.PropertyParser import PropertyParser
+from browser.browserconfiguration import BrowserConfiguration
 from database.restconfiguration import RestConfiguration
 
 
@@ -12,13 +14,15 @@ class ConfigSave(object):
     def load(self):
         config_object = RestConfiguration()
         if not os.path.exists(self.file_name):
-            section_map = {}
+            section_map = ConfigSave.load_from_properties()
         else:
-            config_file = open(self.file_name, 'r')
             root_section = "GIFT-Cloud Browser"
-            config = ConfigParser.ConfigParser()
-            section_map = config.read(root_section)
-            config_file.close()
+            config = ConfigParser()
+            config.read(self.file_name)
+            section_map = {}
+            settings = config.options(root_section)
+            for setting in settings:
+                section_map[setting] = config.get(root_section, setting)
         config_object.server_name = ConfigSave.get_optional(section_map, 'server_name', self.default_configuration)
         config_object.base_url = ConfigSave.get_optional(section_map, 'base_url', self.default_configuration)
         config_object.user_name = ConfigSave.get_optional(section_map, 'user_name', self.default_configuration)
@@ -45,3 +49,15 @@ class ConfigSave(object):
             return map[property_name]
         else:
             return default_map[property_name]
+
+    @staticmethod
+    def load_from_properties():
+        base = BrowserConfiguration.get_user_directory()
+        properties_file = os.path.join(base, "GiftCloudUploader.properties")
+        section_map = {}
+        if os.path.exists(properties_file):
+            properties = PropertyParser(properties_file)
+            section_map['url'] = properties.properties['giftcloud_serverurl']
+            section_map['user_name'] = properties.properties['giftcloud_lastusername']
+        return section_map
+
