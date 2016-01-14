@@ -23,7 +23,10 @@ class ProjectList(LabeledListBox):
         self.xnat_database = xnat_database
         self.selected_projects = selected_projects
         self.project_map = {}
-        self._update_items()
+        try:
+            self._update_items()
+        except:
+            print("Error contacting the server.")
 
     def _update_items(self):
         self.project_map = self.xnat_database.get_project_map()
@@ -113,7 +116,8 @@ class MainFrame:
     def __init__(self, root, default_config):
         self.root = root
         self.config_save = ConfigSave(BrowserConfiguration.get_properties_filename(), default_config)
-        self.database_view = DatabaseView(root, self.config_save)
+        self.database_view = None
+        self.reset_database()
 
         # Create a menu
         root_menu = Menu(root)
@@ -135,8 +139,12 @@ class MainFrame:
         messagebox.showinfo("GIFT-Cloud Downloader", "Version " + __version__)
 
     def menu_settings(self):
-        top = SettingsMenu(self.config_save)
+        top = SettingsMenu(self, self.config_save)
 
+    def reset_database(self):
+        if self.database_view is not None:
+            self.database_view.close()
+        self.database_view = DatabaseView(self.root, self.config_save)
 
 
 class DatabaseView:
@@ -151,21 +159,24 @@ class DatabaseView:
         self.unselected_scans = SelectedItems()
         self.config_save = config_save
 
-        master_paned_window = PanedWindow(root)
-        master_paned_window.pack(fill=BOTH, expand=1)
+        self.master_paned_window = PanedWindow(root)
+        self.master_paned_window.pack(fill=BOTH, expand=1)
 
-        self.projects = ProjectList(master_paned_window, self.selected_projects, self.database)
-        master_paned_window.add(self.projects)
+        self.projects = ProjectList(self.master_paned_window, self.selected_projects, self.database)
+        self.master_paned_window.add(self.projects)
 
-        self.subjects = SubjectList(master_paned_window, self.selected_projects, self.selected_subjects, self.database)
-        master_paned_window.add(self.subjects)
+        self.subjects = SubjectList(self.master_paned_window, self.selected_projects, self.selected_subjects, self.database)
+        self.master_paned_window.add(self.subjects)
 
-        self.scans = ScanList(master_paned_window, self.selected_projects, self.selected_subjects, self.selected_scans,
+        self.scans = ScanList(self.master_paned_window, self.selected_projects, self.selected_subjects, self.selected_scans,
                               self.unselected_scans, self.database)
-        master_paned_window.add(self.scans)
+        self.master_paned_window.add(self.scans)
 
         self.selected_scans.add_listener(self._scan_selection_changed)
         self.unselected_scans.add_listener(self._scan_unselection_changed)
+
+    def close(self):
+        self.master_paned_window.destroy()
 
     def _scan_selection_changed(self, scans):
         if len(scans) > 0:
