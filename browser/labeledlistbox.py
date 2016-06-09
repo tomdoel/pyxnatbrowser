@@ -12,7 +12,8 @@ class LabeledListBox(Frame):
         Frame.__init__(self, parent)
 
         self._list_model = list_model
-        self.list_objects = []
+        self._list_objects = []
+        self._selected_items = []
         scrollbar = Scrollbar(self, orient=VERTICAL)
         Label(self, text=label_text).pack()
         self.listbox = Listbox(self, selectmode=EXTENDED, exportselection=0, yscrollcommand=scrollbar.set, borderwidth=0, highlightthickness=0)
@@ -21,33 +22,45 @@ class LabeledListBox(Frame):
         self.listbox.pack(side=LEFT, fill=BOTH, expand=1)
         self.listbox.bind('<<ListboxSelect>>', self._on_select)
         self._list_model.list_items_model.add_listener(self._list_items_changed)
-        self._update()
+        self._list_model.selected_items_model.add_listener(self._selected_items_changed)
+        self._update_list_items()
 
     def _list_items_changed(self, values):
-        self._update()
+        self._update_list_items()
 
-    def _update(self):
+    def _selected_items_changed(self, values):
+        self._update_selected_items()
+
+    def _update_list_items(self):
         values, labels = self._list_model.list_items_model.get_list_values()
-        self.list_objects = []
-        old_selected_item_labels = [self.listbox.get(int(index)) for index in self.listbox.curselection()]
-        self.listbox.delete(0, END)
-        for value, label in zip(values, labels):
-            self.list_objects.append(value)
-            self.listbox.insert(END, label)
+        if not values == self._list_objects:
+            self._list_objects = []
+            self._selected_items = []
+            self.listbox.delete(0, END)
+            for value, label in zip(values, labels):
+                self._list_objects.append(value)
+                self.listbox.insert(END, label)
+            self._update_selected_items()
 
-        for index, label in enumerate(labels):
-            if label in old_selected_item_labels:
-                self.listbox.selection_set(index)
+    def _update_selected_items(self):
+        selected_items = self._list_model.selected_items_model.selected_items
+        if not selected_items == self._selected_items:
+            self._selected_items = selected_items
+            for index, list_item in enumerate(self._list_objects):
+                if list_item in selected_items:
+                    self.listbox.selection_set(index)
 
     def _on_select(self, evt):
-        selected_items = [self.list_objects[int(index)] for index in self.listbox.curselection()]
-        self._list_model.selected_items_model.selected_items = selected_items
+        visible_selected_indices = self.listbox.curselection()
+        for index, list_item in enumerate(self._list_objects):
+            if index in visible_selected_indices:
+                self._list_model.selected_items_model.select(list_item)
+            else:
+                self._list_model.selected_items_model.deselect(list_item)
 
 
 class ListModel:
     def __init__(self):
-        # Observable.__init__(self)
-
         self._selected_items_model = SelectedItemsModel()
         self._list_items_model = ListItemsModel()
 
@@ -80,6 +93,16 @@ class SelectedItemsModel(Observable):
     def __init__(self):
         Observable.__init__(self)
         self._selected_items = []
+
+    def select(self, item):
+        if item not in self.selected_items:
+            self.selected_items.append(item)
+            self._notify(self.selected_items)
+
+    def deselect(self, item):
+        if item in self.selected_items:
+            self.selected_items.remove(item)
+            self._notify(self.selected_items)
 
     @property
     def selected_items(self):
