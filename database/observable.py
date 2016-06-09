@@ -5,6 +5,8 @@
 
 class Observable(object):
     def __init__(self):
+        object.__init__(self)
+
         self._event_handlers = []
 
     def add_listener(self, listener):
