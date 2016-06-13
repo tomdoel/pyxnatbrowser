@@ -39,6 +39,9 @@ class XnatNatScan(Base):
             number_of_images = number_of_images + resource.FileCount
         return number_of_images
 
+    def get_preview_image(self):
+        return self.rest_client.get_preview_image(self.session_id, self.scan_id)
+
     def _populate_resource_list_if_necessary(self):
         if self.resource_list is None:
             self.resource_list = self.rest_client.get_resource_list(self.project_id, self.subject_id, self.session_id,

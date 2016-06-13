@@ -3,9 +3,10 @@
 # Distributed under the Simplified BSD License.
 
 import json
-import urllib
 
 import shutil
+import urllib
+from urllib.request import HTTPPasswordMgrWithDefaultRealm
 
 from database.xnatproject import XnatProject
 from database.xnatresource import XnatResource
@@ -54,7 +55,7 @@ class RestClient:
     def get_session_map(self, project_id, subject_id):
 
         struct_from_server = self._request_json(
-                'REST/projects/' + project_id + '/subjects/' + subject_id + '/experiments?format=json')
+            'REST/projects/' + project_id + '/subjects/' + subject_id + '/experiments?format=json')
         session_map = {}
 
         if len(struct_from_server) > 0:
@@ -68,8 +69,8 @@ class RestClient:
     def get_scan_map(self, project_id, subject_id, session_id):
 
         struct_from_server = self._request_json(
-                'REST/projects/' + project_id + '/subjects/' + subject_id + '/experiments/' + session_id +
-                '/scans?format=json')
+            'REST/projects/' + project_id + '/subjects/' + subject_id + '/experiments/' + session_id +
+            '/scans?format=json')
         scan_map = {}
 
         if len(struct_from_server) > 0:
@@ -83,16 +84,16 @@ class RestClient:
     def get_resource_list(self, project_id, subject_id, session_id, scan_id):
 
         struct_from_server = self._request_json(
-                'REST/projects/' + project_id + '/subjects/' + subject_id + '/experiments/' + session_id + '/scans/' +
-                scan_id + '/resources?format=json')
+            'REST/projects/' + project_id + '/subjects/' + subject_id + '/experiments/' + session_id + '/scans/' +
+            scan_id + '/resources?format=json')
         resource_list = []
 
         if len(struct_from_server) > 0:
             object_list = struct_from_server['ResultSet']['Result']
             for server_object in object_list:
                 resource_list.append(
-                        XnatResource.create_from_server_object(self, server_object, project_id, subject_id, session_id,
-                                                               scan_id))
+                    XnatResource.create_from_server_object(self, server_object, project_id, subject_id, session_id,
+                                                           scan_id))
 
         return resource_list
 
@@ -104,12 +105,32 @@ class RestClient:
 
     def get_subject_label_from_pseudoname(self, project_id, pseudoname):
         return_object = self._request_json(
-                'REST/projects/' + project_id + '/pseudonyms/' + pseudoname + '?format=json&owner=true&member=true')
+            'REST/projects/' + project_id + '/pseudonyms/' + pseudoname + '?format=json&owner=true&member=true')
 
         if return_object is None:
             return None
         else:
             return return_object.items.data_fields.label
+
+    def generate_preview_image(self, project_id, session_id):
+        self._post_request(
+            'data/projects/' + project_id + '/pipelines/WebBasedQCImageCreator/experiments/' + session_id)
+        return None
+
+    def get_preview_image(self, session_id, scan_id):
+        try:
+            return_object = self._request_file(
+                'REST/experiments/' + session_id + '/scans/' + scan_id + '/resources/SNAPSHOTS/files?file_content=ORIGINAL&index=0')
+        except urllib.error.HTTPError as err:
+            if err.code == 404:
+                return None
+            else:
+                raise
+
+        if return_object is None:
+            return None
+        else:
+            return return_object
 
     def _request_json(self, url):
         return self._request(url + '&MediaType=application/json&ContentType=json')
@@ -125,6 +146,30 @@ class RestClient:
         request = urllib.request.Request(full_url, None, headers)
         response = urllib.request.urlopen(request).read().decode('utf-8')
         return json.loads(response)
+
+    def _request_file(self, url):
+        if self.session_cookie is None:
+            self._force_authentication()
+
+        full_url = self.authenticated_base_url + url
+        headers = {
+            'Cookie': 'JSESSIONID=' + self.session_cookie
+        }
+        request = urllib.request.Request(full_url, None, headers)
+        response = urllib.request.urlopen(request).read()
+        return response
+
+    def _post_request(self, url):
+        if self.session_cookie is None:
+            self._force_authentication()
+
+        full_url = self.authenticated_base_url + url
+        headers = {
+            'Cookie': 'JSESSIONID=' + self.session_cookie
+        }
+        request = urllib.request.Request(full_url, None, headers, None, None, 'POST')
+        response = urllib.request.urlopen(request).read().decode('utf-8')
+        return response
 
     def _request_and_save_file(self, zip_file_name, url):
 

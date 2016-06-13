@@ -29,6 +29,17 @@ class XnatSubject(Base):
         self._populate_session_map_if_necessary()
         return self.session_map
 
+    def get_session(self, session_id):
+        if session_id is None:
+            return None
+
+        self._populate_session_map_if_necessary()
+
+        if not (session_id in self.session_map):
+            return None
+        else:
+            return self.session_map[session_id]
+
     def find_scan(self, scan_id):
         self._populate_session_map_if_necessary()
         for session in self.session_map.values():
