@@ -42,6 +42,9 @@ class XnatNatScan(Base):
     def get_preview_image(self):
         return self.rest_client.get_preview_image(self.session_id, self.scan_id)
 
+    def get_dicom_metaheader(self):
+        return self.rest_client.get_dicom_metaheader(self.project_id, self.subject_id, self.session_id, self.scan_id)
+
     def _populate_resource_list_if_necessary(self):
         if self.resource_list is None:
             self.resource_list = self.rest_client.get_resource_list(self.project_id, self.subject_id, self.session_id,

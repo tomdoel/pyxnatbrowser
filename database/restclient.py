@@ -132,6 +132,14 @@ class RestClient:
         else:
             return return_object
 
+    def get_dicom_metaheader(self, project_id, subject_id, session_id, scan_id):
+        return_object = self._request_json(
+            'data/services/dicomdump?src=/archive/projects/' + project_id + '/subjects/' + subject_id + '/experiments/' + session_id + '/scans/' + scan_id + '&format=json&owner=true&member=true')
+        if return_object is None:
+            return None
+        else:
+            return return_object['ResultSet']['Result']
+
     def _request_json(self, url):
         return self._request(url + '&MediaType=application/json&ContentType=json')
 
