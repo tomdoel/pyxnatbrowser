@@ -97,6 +97,16 @@ class RestClient:
 
         return resource_list
 
+    def get_file_list(self, project_id, subject_id, session_id, scan_id, resource_id):
+
+        struct_from_server = self._request_json(
+            'data/archive/projects/' + project_id + '/subjects/' + subject_id + '/experiments/' + session_id + '/scans/' +
+            scan_id + '/resources/' + resource_id + '/files?format=json')
+        return struct_from_server
+
+    def download_single_file(self, zip_file_name, uri):
+        self._request_and_save_file(zip_file_name, uri)
+
     def download_scan_to_zip_file(self, zip_file_name, project_id, subject_id, session_id, scan_id, resource_id):
         self._request_and_save_file(zip_file_name,
                                     'REST/projects/' + project_id + '/subjects/' + subject_id + '/experiments/' +
